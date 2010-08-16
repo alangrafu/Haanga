@@ -290,7 +290,8 @@ class Haanga_Compiler_Tokenizer
                         }
                         break;
                     default: 
-                        if (!$this->is_whitespace($data[$i]) && !isset(self::$operations[$data[$i]])) {
+                        if (!$this->is_whitespace($data[$i]) &&
+                            !isset(self::$operations[$data[$i]]) || $value[strlen($value)-1] == '.') {
                             $this->error("Unexpected '{$data[$i]}'");
                         }
                         $this->value = $value;
