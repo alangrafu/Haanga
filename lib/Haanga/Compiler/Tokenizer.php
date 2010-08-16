@@ -43,9 +43,7 @@ class HG_Parser Extends Haanga_Compiler_Parser
     /* subclass to made easier references to constants */
 }
 
-//var_dump(Haanga_Compiler_Tokenizer::$tags);
-
-$foo = Haanga_Compiler_Tokenizer::init("if\n\n\nblock ".'"foob\tar \" '."\n".' \n:-)"'."    \n5 != 66.9\nTRUE", NULL);
+$foo = Haanga_Compiler_Tokenizer::init("if\n\n\nblock ".'"foob\tar \" '."\n".' \n:-)"'."    \n! 5 != 66.9\nTRUE", NULL);
 
 
 while ($foo->yylex()) {
@@ -62,10 +60,7 @@ class Haanga_Compiler_Tokenizer
         'empty'         => HG_Parser::T_EMPTY,
         'TRUE'          => HG_Parser::T_TRUE,
         'FALSE'         => HG_Parser::T_FALSE,
-        '=='            => HG_Parser::T_EQ,
-        '==='           => HG_Parser::T_EQ,
         'AND'           => HG_Parser::T_AND,
-        '&&'            => HG_Parser::T_AND,
         'OR'            => HG_Parser::T_OR,
         'not'           => HG_Parser::T_NOT,
         'NOT'           => HG_Parser::T_NOT,
@@ -75,6 +70,32 @@ class Haanga_Compiler_Tokenizer
         'spacefull'     => HG_Parser::T_SPACEFULL,
         'autoescape'    => HG_Parser::T_AUTOESCAPE,
         'filter'        => HG_Parser::T_FILTER,
+    );
+
+    static $operations = array(
+        '&&'    => HG_Parser::T_AND,
+        '=='    => HG_Parser::T_EQ,
+        '==='   => HG_Parser::T_EQ,
+        '->'    => HG_Parser::T_OBJ,
+        '||'    => HG_Parser::T_OR,
+        '['     => HG_Parser::T_BRACKETS_OPEN,
+        ']'     => HG_Parser::T_BRACKETS_CLOSE,
+        '-'     => HG_Parser::T_MINUS,
+        '+'     => HG_Parser::T_PLUS,
+        '*'     => HG_Parser::T_TIMES,
+        '/'     => HG_Parser::T_DIV, 
+        '.'     => HG_Parser::T_DOT,
+        '>='    => HG_Parser::T_GE,
+        '>'     => HG_Parser::T_GT,
+        '<='    => HG_Parser::T_LE,
+        '<'     => HG_Parser::T_LT,
+        '|'     => HG_Parser::T_PIPE,
+        '!='    => HG_Parser::T_NE,
+        '!'     => HG_Parser::T_NOT,
+        '('     => HG_Parser::T_LPARENT,
+        ')'     => HG_Parser::T_RPARENT,
+        '_('    => HG_Parser::T_INTL,
+        ','     => HG_Parser::T_COMMA,
     );
 
     public $value;
@@ -89,104 +110,12 @@ class Haanga_Compiler_Tokenizer
         $this->length   = strlen($data);
     }
 
-    function getTag()
-    {
-        $i    = &$this->N;
-        $data = substr($this->data, $i);
-        foreach (self::$tags as $value => $token) {
-            $len = strlen($value);
-            if (strncmp($data, $value, $len) == 0) {
-                if (isset($data[$len+1]) && $data[$len+1] != ' ') {
-                    //continue;
-                }
-                $this->token = $token;
-                $this->value = $value;
-                $this->N    += $len;
-                return TRUE;
-            }
-        }
-        return FALSE;
-    }
-
     function yylex()
     {
         $data        = &$this->data;
         $this->token = NULL;
         for ($i=&$this->N; is_null($this->token) && $i < $this->length; ++$i) {
             switch ($data[$i]) {
-            case '[':
-                $this->token = HG_Parser::T_BRACKETS_OPEN;
-                $this->value = $data[$i];
-                break;
-            case ']':
-                $this->token = HG_Parser::T_BRACKETS_CLOSE;
-                $this->value = $data[$i];
-                break;
-            case '|':
-                if ($data[$i+1] == '|') {
-                    $this->token = HG_Parser::T_OR;
-                    $this->value = "||";
-                    ++$i;
-                    break;
-                }
-                $this->token = HG_Parser::T_PIPE;
-                $this->value = $data[$i];
-                break;
-            case '!':
-                if ($data[$i+1] == '=') {
-                    $this->token = HG_Parser::T_NE;
-                    $this->value = "!=";
-                    ++$i;
-                    break;
-                }
-                $this->token = HG_Parser::T_NOT;
-                $this->value = $data[$i];
-                break;
-            case '+':
-                $this->token = HG_Parser::T_PLUS;
-                $this->value = $data[$i];
-                break;
-            case '-':
-                $this->token = HG_Parser::T_MINUS;
-                $this->value = $data[$i];
-                break;
-            case '*':
-                $this->token = HG_Parser::T_TIMES;
-                $this->value = $data[$i];
-                break;
-            case '/':
-                $this->token = HG_Parser::T_DIV;
-                $this->value = $data[$i];
-                break;
-            case '>':
-                if ($data[$i+1] == '=') {
-                    $this->token = HG_Parser::T_GE;
-                    $this->value = ">=";
-                    ++$i;
-                    break;
-                }
-                $this->token = HG_Parser::T_GT;
-                $this->value = $data[$i];
-                break;
-            case '<':
-                if ($data[$i+1] == '=') {
-                    $this->token = HG_Parser::T_LE;
-                    $this->value = "<=";
-                    ++$i;
-                    break;
-                }
-                $this->token = HG_Parser::T_LT;
-                $this->value = $data[$i];
-                break;
-            case "_":
-                if ($data[$i+1] == '(') {
-                    $this->value = "_(";
-                    $this->token = HG_Parser::T_INTL;
-                    ++$i;
-                    break;
-                }
-                $this->Error("Unexpected _");
-                break;
 
             /* strings {{{ */
             case '"':
@@ -266,6 +195,38 @@ class Haanga_Compiler_Tokenizer
         }
 
         return isset($this->token);
+    }
+
+    function getTag()
+    {
+        $i    = &$this->N;
+        $data = substr($this->data, $i);
+        foreach (self::$tags as $value => $token) {
+            $len = strlen($value);
+            if (strncmp($data, $value, $len) == 0) {
+                if (isset($data[$len+1]) && $data[$len+1] != ' ') {
+                    //continue;
+                }
+                $this->token = $token;
+                $this->value = $value;
+                $this->N    += $len;
+                return TRUE;
+            }
+        }
+
+        foreach (self::$operations as $value => $token) {
+            $len = strlen($value);
+            if (strncmp($data, $value, $len) == 0) {
+                $this->token = $token;
+                $this->value = $value;
+                $this->N    += $len;
+                return TRUE;
+            }
+        }
+
+        /* try to get alpha */
+
+        return FALSE;
     }
 
     static function init($template, $compiler, $file='')
