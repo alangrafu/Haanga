@@ -43,7 +43,7 @@ class HG_Parser Extends Haanga_Compiler_Parser
     /* subclass to made easier references to constants */
 }
 
-$foo = Haanga_Compiler_Tokenizer::init("if\n\n\nblock ".'"foob\tar \" '."\n".' \n:-)"'."    \n! 5 != 66.9\nTRUE", NULL);
+$foo = Haanga_Compiler_Tokenizer::init("if\n\n\nblock ".'"foob\tar \" '."\n".' \n:-)"'."    \n! 5 != 66.9\n endfoobar \nTRUE\n\nTRUEfoo", NULL);
 
 
 while ($foo->yylex()) {
@@ -187,8 +187,19 @@ class Haanga_Compiler_Tokenizer
             case " ": case "\t": case "\r": case "\f":
                 break; /* whitespaces are ignored */
             default: 
-                if (!$this->getTag()) {
-                    die("error: unexpected ".substr($data, $i));
+                if (!$this->getTag() && !$this->getOperator()) {
+                    $alpha = $this->getAlpha();
+                    if ($alpha === FALSE) {
+                        die("error: unexpected ".substr($data, $i));
+                    }
+                    static $tag=NULL;
+                    if (!$tag) {
+                        $tag = Haanga_Extension::getInstance('Tag');
+                    }
+                    $value = $tag->isValid($alpha);
+                    $this->token = $value ? $value : HG_Parser::T_ALPHA;
+                    $this->value = $alpha;
+
                 }
                 break;
             }
@@ -199,13 +210,13 @@ class Haanga_Compiler_Tokenizer
 
     function getTag()
     {
-        $i    = &$this->N;
-        $data = substr($this->data, $i);
+        $data = substr($this->data, $this->N);
         foreach (self::$tags as $value => $token) {
             $len = strlen($value);
             if (strncmp($data, $value, $len) == 0) {
-                if (isset($data[$len+1]) && $data[$len+1] != ' ') {
-                    //continue;
+                if (isset($data[$len]) && !$this->is_token_end($data[$len])) {
+                    /* probably a variable name TRUEfoo (and not TRUE) */
+                    continue;
                 }
                 $this->token = $token;
                 $this->value = $value;
@@ -214,6 +225,19 @@ class Haanga_Compiler_Tokenizer
             }
         }
 
+        /* /end([a-zA-Z][a-zA-Z0-9]*)/ */
+        if (strncmp($data, "end", 3) == 0) {
+            $this->value = $this->getAlpha();
+            $this->token = HG_Parser::T_CUSTOM_END;
+            return TRUE;
+        }
+        
+        return FALSE;
+    }
+
+    function getOperator()
+    {
+        $data = substr($this->data, $this->N);
         foreach (self::$operations as $value => $token) {
             $len = strlen($value);
             if (strncmp($data, $value, $len) == 0) {
@@ -224,10 +248,57 @@ class Haanga_Compiler_Tokenizer
             }
         }
 
-        /* try to get alpha */
-
         return FALSE;
     }
+
+
+    /**
+     *  Return TRUE if $letter is a valid "token_end". We use token_end
+     *  to avoid confuse T_ALPHA TRUEfoo with TRUE and foo (T_ALPHA)
+     *
+     *  @param string $letter
+     *
+     *  @return bool
+     */
+    protected function is_token_end($letter)
+    {
+        /* [^a-zA-Z0-9_\.] */
+        return !(
+            ('a' <= $letter && 'z' >= $letter) ||
+            ('A' <= $letter && 'Z' >= $letter) || 
+            ('0' <= $letter && '9' >= $letter) || 
+            $letter == "_"  || $letter == "."
+        );
+    }
+
+    function getAlpha()
+    {
+        /* [a-zA-Z][a-zA-Z0-9]* */
+        $i    = &$this->N;
+        $data = &$this->data;
+
+        if (  !('a' <= $data[$i] && 'z' >= $data[$i]) &&
+            !('A' <= $data[$i] && 'Z' >= $data[$i]) ) {
+            return FALSE;
+        }
+
+        $value  = "";
+        for (; $i < $this->length; ++$i) {
+            if (
+                ('a' <= $data[$i] && 'z' >= $data[$i]) ||
+                ('A' <= $data[$i] && 'Z' >= $data[$i]) || 
+                ('0' <= $data[$i] && '9' >= $data[$i]) || 
+                $data[$i] == "_"  || $data[$i] == "."
+            ) {
+                $value .= $data[$i];
+            } else {
+                break;
+            }
+        }
+
+        return $value;
+    }
+
 
     static function init($template, $compiler, $file='')
     {
