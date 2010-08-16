@@ -45,7 +45,7 @@ class HG_Parser Extends Haanga_Compiler_Parser
 
 //var_dump(Haanga_Compiler_Tokenizer::$tags);
 
-$foo = Haanga_Compiler_Tokenizer::init("if block     \n5 != 66.9\nTRUE", NULL);
+$foo = Haanga_Compiler_Tokenizer::init("if\n\n\nblock ".'"foob\tar \" '."\n".' \n:-)"'."    \n5 != 66.9\nTRUE", NULL);
 
 
 while ($foo->yylex()) {
@@ -187,23 +187,37 @@ class Haanga_Compiler_Tokenizer
                 }
                 $this->Error("Unexpected _");
                 break;
+
             /* strings {{{ */
             case '"':
             case "'":
                 $end   = $data[$i];
                 $value = "";
-                while (TRUE) {
-                    if (!isset($data[++$i])) {
-                        $this->Error("unclosed string");
-                    }
+                while ($data[++$i] != $end) {
                     switch ($data[$i]) {
                     case "\\":
+                        switch ($data[++$i]) {
+                        case "n":
+                            $value .= "\n";
+                            break;
+                        case "t":
+                            $value .= "\t";
+                            break;
+                        default:
+                            $value .= $data[$i];
+                        }
                         break;
                     case $end:
                         --$i;
                         break 2;
                     default:
+                        if ($data[$i] == "\n") {
+                            $this->line++;
+                        }
                         $value .= $data[$i];
+                    }
+                    if (!isset($data[$i+1])) {
+                        $this->Error("unclosed string");
                     }
                 }
                 $this->value = $value;
@@ -211,10 +225,34 @@ class Haanga_Compiler_Tokenizer
                 break;
             /* }}} */
 
-            case '0': case '1': case '2': case '3': case '4': case '5':
-            case '6': case '7': case '8': case '9': 
-                die('number');
+            /* number {{{ */
+            case '0': case '1': case '2': case '3': case '4':
+            case '5': case '6': case '7': case '8': case '9': 
+                $value = "";
+                $dot   = FALSE;
+                for (; $i < $this->length; ++$i) {
+                    switch ($data[$i]) {
+                    case '0': case '1': case '2': case '3': case '4': 
+                    case '5': case '6': case '7': case '8': case '9': 
+                        $value .= $data[$i];
+                        break;
+                    case '.':
+                        if (!$dot) {
+                            $value .= ".";
+                            $dot    = TRUE;
+                        } else {
+                            $this->error("Invalid number");
+                        }
+                        break;
+                    default: 
+                        $this->value = $value;
+                        $this->token = HG_Parser::T_NUMERIC;
+                        break 2;
+                    }
+                }
                 break;
+            /* }}} */
+
             case "\n":
                 $this->line++;
             case " ": case "\t": case "\r": case "\f":
@@ -226,6 +264,7 @@ class Haanga_Compiler_Tokenizer
                 break;
             }
         }
+
         return isset($this->token);
     }
 
