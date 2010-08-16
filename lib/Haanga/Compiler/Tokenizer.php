@@ -43,7 +43,7 @@ class HG_Parser Extends Haanga_Compiler_Parser
     /* subclass to made easier references to constants */
 }
 
-$foo = Haanga_Compiler_Tokenizer::init("if\n\n\nblock ".'"foob\tar \" '."\n".' \n:-)"'."    \n! 5 != 66.9\n endfoobar \nTRUE\n\nTRUEfoo", NULL);
+$foo = Haanga_Compiler_Tokenizer::init("if\n\n\nblock ".'"foob\tar \" '."\n".' \n:-)"'."    \n! 5 != 66.9\n endfoobar \nTRUE\n\nTRUE_oo", NULL);
 
 
 while ($foo->yylex()) {
@@ -262,23 +262,23 @@ class Haanga_Compiler_Tokenizer
      */
     protected function is_token_end($letter)
     {
-        /* [^a-zA-Z0-9_\.] */
+        /* [^a-zA-Z0-9_] */
         return !(
             ('a' <= $letter && 'z' >= $letter) ||
             ('A' <= $letter && 'Z' >= $letter) || 
             ('0' <= $letter && '9' >= $letter) || 
-            $letter == "_"  || $letter == "."
+            $letter == "_" 
         );
     }
 
     function getAlpha()
     {
-        /* [a-zA-Z][a-zA-Z0-9]* */
+        /* [a-zA-Z_][a-zA-Z0-9_]* */
         $i    = &$this->N;
         $data = &$this->data;
 
         if (  !('a' <= $data[$i] && 'z' >= $data[$i]) &&
-            !('A' <= $data[$i] && 'Z' >= $data[$i]) ) {
+            !('A' <= $data[$i] && 'Z' >= $data[$i]) && $data[$i] != '_') {
             return FALSE;
         }
 
@@ -288,7 +288,7 @@ class Haanga_Compiler_Tokenizer
                 ('a' <= $data[$i] && 'z' >= $data[$i]) ||
                 ('A' <= $data[$i] && 'Z' >= $data[$i]) || 
                 ('0' <= $data[$i] && '9' >= $data[$i]) || 
-                $data[$i] == "_"  || $data[$i] == "."
+                $data[$i] == "_"
             ) {
                 $value .= $data[$i];
             } else {
