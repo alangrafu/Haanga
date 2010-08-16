@@ -70,6 +70,7 @@ class Haanga_Compiler_Tokenizer
         'extends'       => HG_Parser::T_EXTENDS,
         'regroup'       => HG_Parser::T_REGROUP,
         'with'          => HG_Parser::T_WITH,
+        '_('            => HG_Parser::T_INTL,
     );
 
     static $operations = array(
@@ -95,10 +96,10 @@ class Haanga_Compiler_Tokenizer
         '!'     => HG_Parser::T_NOT,
         '('     => HG_Parser::T_LPARENT,
         ')'     => HG_Parser::T_RPARENT,
-        '_('    => HG_Parser::T_INTL,
         ','     => HG_Parser::T_COMMA,
         '%}'    => HG_Parser::T_CLOSE_TAG,
         '}}'    => HG_Parser::T_PRINT_CLOSE,
+        '%'     => HG_Parser::T_MOD,
     );
 
     public $value;
@@ -185,7 +186,15 @@ class Haanga_Compiler_Tokenizer
                 $this->yylex_html();
         }
 
-        return !empty($this->token);
+        if (empty($this->token)) {
+            if ($this->status != self::IN_NONE && $this->status != self::IN_HTML) {
+                $this->Error("Unexpected end");
+            }
+            return FALSE;
+        }
+
+        return TRUE;
+
     }
 
     function yylex_html()
@@ -281,6 +290,9 @@ class Haanga_Compiler_Tokenizer
                         }
                         break;
                     default: 
+                        if (!$this->is_whitespace($data[$i]) && !isset(self::$operations[$data[$i]])) {
+                            $this->error("Unexpected '{$data[$i]}'");
+                        }
                         $this->value = $value;
                         $this->token = HG_Parser::T_NUMERIC;
                         break 4; /* break the main loop */
@@ -297,7 +309,7 @@ class Haanga_Compiler_Tokenizer
                 if (!$this->getTag() && !$this->getOperator()) {
                     $alpha = $this->getAlpha();
                     if ($alpha === FALSE) {
-                        die("error: unexpected ".substr($data, $i));
+                        $this->error("error: unexpected ".substr($data, $i));
                     }
                     static $tag=NULL;
                     if (!$tag) {
@@ -317,6 +329,11 @@ class Haanga_Compiler_Tokenizer
             $this->status = self::IN_NONE;
         }
 
+    }
+
+    function is_whitespace($letter)
+    {
+        return $letter=="\n" || $letter==" " || $letter=="\t" || $letter=="\r";
     }
 
     function getTag()
@@ -344,6 +361,11 @@ class Haanga_Compiler_Tokenizer
         }
         
         return FALSE;
+    }
+
+    function Error($text)
+    {
+        throw new Haanga_Compiler_Exception($text." in :".$this->line);
     }
 
     function getOperator()

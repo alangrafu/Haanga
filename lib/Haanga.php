@@ -335,7 +335,16 @@ class Haanga
                 $compiler->setDebug($php.".dump");
             }
 
-            $code = $compiler->compile_file($tpl, FALSE, $vars);
+            try {
+                $code = $compiler->compile_file($tpl, FALSE, $vars);
+            } catch (Exception $e) {
+                if (isset($fp)) {
+                    fclose($fp);
+                    unlink($php);
+                }
+                /* re-throw exception */
+                throw $e;
+            }
 
             if (isset($fp)) {
                 ftruncate($fp, 0); // truncate file
