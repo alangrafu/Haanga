@@ -215,6 +215,8 @@ class Haanga_Compiler_Tokenizer
                     break;
                 }
                 break;
+            case "\n":
+                $this->line++;
             default:
                 $value .= $data[$i];
             }
