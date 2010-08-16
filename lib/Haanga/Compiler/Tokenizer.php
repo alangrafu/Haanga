@@ -43,7 +43,7 @@ class HG_Parser Extends Haanga_Compiler_Parser
     /* subclass to made easier references to constants */
 }
 
-$foo = Haanga_Compiler_Tokenizer::init("if\n\n\nblock ".'"foob\tar \" '."\n".' \n:-)"'."    \n! 5 != 66.9\n endfoobar \nTRUE\n\nTRUE_oo", NULL);
+$foo = Haanga_Compiler_Tokenizer::init("<foo>{if} block{% if\n\n\nblock ".'"foob\tar \" '."\n".' \n:-)"'."    \n! 5 != 66.9\n endfoobar \nTRUE\n\nTRUE_oo", NULL);
 
 
 while ($foo->yylex()) {
@@ -100,6 +100,11 @@ class Haanga_Compiler_Tokenizer
 
     public $value;
     public $token;
+    public $status = self::IN_HTML;
+
+    const IN_HTML   = 1;
+    const IN_TAG    = 2;
+    const IN_ECHO   = 3;
 
     function __construct($data, $compiler)
     {
@@ -112,10 +117,70 @@ class Haanga_Compiler_Tokenizer
 
     function yylex()
     {
-        $data        = &$this->data;
         $this->token = NULL;
+    
+        switch ($this->status)
+        {
+            case self::IN_TAG:
+            case self::IN_ECHO:
+                $this->yylex_main();
+                break;
+            default:
+                $this->yylex_html();
+        }
+
+        return !empty($this->token);
+    }
+
+    function yylex_html()
+    {
+        $data  = &$this->data;
+        $value = "";
         for ($i=&$this->N; is_null($this->token) && $i < $this->length; ++$i) {
             switch ($data[$i]) {
+            case '{':
+                switch ($data[$i+1]) {
+                case '%':
+                    $this->status = self::IN_TAG;
+                    $i += 2;
+                    break 3;
+                case '{':
+                    $this->status = self::IN_ECHO;
+                    $i += 2;
+                    break 3;
+                case '#':
+                    $this->status = self::IN_COMMENT;
+                    $i += 2;
+                    break 3;
+                default:
+                    $value .= $data[$i];
+                    break;
+                }
+                break;
+            default:
+                $value .= $data[$i];
+            }
+        }
+        $this->token = HG_Parser::T_HTML;
+        $this->value = $value;
+    }
+
+    function yylex_main()
+    {
+        $data = &$this->data;
+
+        for ($i=&$this->N; is_null($this->token) && $i < $this->length; ++$i) {
+            switch ($data[$i]) {
+            case '}':
+                switch ($data[$i+1]) {
+                case '%':
+                case '}':
+                case '#':
+                    $this->status = self::IN_HTML;
+                    $i += 2;
+                    break 3;
+                }
+                break;
 
             /* strings {{{ */
             case '"':
@@ -204,8 +269,6 @@ class Haanga_Compiler_Tokenizer
                 break;
             }
         }
-
-        return isset($this->token);
     }
 
     function getTag()
