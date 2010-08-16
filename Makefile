@@ -14,4 +14,4 @@ test-fast:
 
 
 edit:
-	vim lib/Haanga/Compiler/Parser.y  lib/Haanga/Compiler/Lexer.lex -O
+	vim lib/Haanga/Compiler/Parser.y  lib/Haanga/Compiler/Tokenizer.php -O
