@@ -35,20 +35,11 @@
   +---------------------------------------------------------------------------------+
 */
 
-
-require dirname(__FILE__)."/Parser.php";
-
 class HG_Parser Extends Haanga_Compiler_Parser
 {
     /* subclass to made easier references to constants */
 }
 
-$foo = Haanga_Compiler_Tokenizer::init("<foo>{if} block{% if\n\n\nblock ".'"foob\tar \" '."\n".' \n:-)"'."    \n! 5 != 66.9\n endfoobar \nTRUE\n\nTRUE_oo", NULL);
-
-
-while ($foo->yylex()) {
-    var_dump(array($foo->token, $foo->value, $foo->line));
-}
 
 class Haanga_Compiler_Tokenizer
 {
@@ -67,9 +58,18 @@ class Haanga_Compiler_Tokenizer
         'if'            => HG_Parser::T_IF,
         'else'          => HG_Parser::T_ELSE,
         'ifequal'       => HG_Parser::T_IFEQUAL,
+        'ifnotequal'    => HG_Parser::T_IFNOTEQUAL,
+        'ifchanged'     => HG_Parser::T_IFCHANGED,
         'spacefull'     => HG_Parser::T_SPACEFULL,
         'autoescape'    => HG_Parser::T_AUTOESCAPE,
         'filter'        => HG_Parser::T_FILTER,
+        'in'            => HG_Parser::T_IN,
+        'include'       => HG_Parser::T_INCLUDE,
+        'as'            => HG_Parser::T_AS,
+        'by'            => HG_Parser::T_BY,
+        'extends'       => HG_Parser::T_EXTENDS,
+        'regroup'       => HG_Parser::T_REGROUP,
+        'with'          => HG_Parser::T_WITH,
     );
 
     static $operations = array(
@@ -84,6 +84,7 @@ class Haanga_Compiler_Tokenizer
         '+'     => HG_Parser::T_PLUS,
         '*'     => HG_Parser::T_TIMES,
         '/'     => HG_Parser::T_DIV, 
+        ':'     => HG_Parser::T_COLON, 
         '.'     => HG_Parser::T_DOT,
         '>='    => HG_Parser::T_GE,
         '>'     => HG_Parser::T_GT,
@@ -96,15 +97,19 @@ class Haanga_Compiler_Tokenizer
         ')'     => HG_Parser::T_RPARENT,
         '_('    => HG_Parser::T_INTL,
         ','     => HG_Parser::T_COMMA,
+        '%}'    => HG_Parser::T_CLOSE_TAG,
+        '}}'    => HG_Parser::T_PRINT_CLOSE,
     );
 
     public $value;
     public $token;
-    public $status = self::IN_HTML;
+    public $status = self::IN_NONE;
 
-    const IN_HTML   = 1;
-    const IN_TAG    = 2;
-    const IN_ECHO   = 3;
+    const IN_NONE    = 0;
+    const IN_HTML    = 1;
+    const IN_TAG     = 2;
+    const IN_ECHO    = 3;
+    const IN_COMMENT = 4;
 
     function __construct($data, $compiler)
     {
@@ -118,12 +123,63 @@ class Haanga_Compiler_Tokenizer
     function yylex()
     {
         $this->token = NULL;
+
+        if ($this->status == self::IN_NONE) {
+            $data = &$this->data;
+            $i    = &$this->N;
+            switch ($data[$i]) {
+            case '{':
+                switch ($data[$i+1]) {
+                case '%':
+                    $this->status = self::IN_TAG;
+                    $this->value  = "{%";
+                    $this->token  = HG_Parser::T_OPEN_TAG;
+                    $i += 2;
+                    return TRUE;
+                    break;
+                case '#':
+                    $this->status = self::IN_COMMENT;
+                    $this->value  = "{#";
+                    $this->token  = HG_Parser::T_COMMENT_OPEN;
+                    $i += 2;
+                    return TRUE;
+                    break;
+                case '{':
+                    $this->status = self::IN_ECHO;
+                    $this->value  = "{{";
+                    $this->token  = HG_Parser::T_PRINT_OPEN;
+                    $i += 2;
+                    return TRUE;
+                    break;
+                default:
+                    $this->status = self::IN_HTML;
+                    break;
+                }
+                break;
+            default:
+                $this->status = self::IN_HTML;
+                break;
+            }
+        }
     
         switch ($this->status)
         {
             case self::IN_TAG:
             case self::IN_ECHO:
                 $this->yylex_main();
+                break;
+            case self::IN_COMMENT:
+                $data  = & $this->data;
+                $i     = & $this->N;
+                $sdata = substr($data, $i);
+
+                if (($pos=strpos($sdata, "#}")) === FALSE) {
+                    $this->error("unexpected end");
+                }
+                $this->value  = substr($sdata, 0, $pos);
+                $this->token  = HG_Parser::T_COMMENT;
+                $this->status = self::IN_NONE; 
+                $i += $pos + 2;
                 break;
             default:
                 $this->yylex_html();
@@ -136,21 +192,14 @@ class Haanga_Compiler_Tokenizer
     {
         $data  = &$this->data;
         $value = "";
-        for ($i=&$this->N; is_null($this->token) && $i < $this->length; ++$i) {
+        for ($i=&$this->N;$i < $this->length; ++$i) {
             switch ($data[$i]) {
             case '{':
                 switch ($data[$i+1]) {
                 case '%':
-                    $this->status = self::IN_TAG;
-                    $i += 2;
-                    break 3;
                 case '{':
-                    $this->status = self::IN_ECHO;
-                    $i += 2;
-                    break 3;
                 case '#':
-                    $this->status = self::IN_COMMENT;
-                    $i += 2;
+                    $this->status = self::IN_NONE;
                     break 3;
                 default:
                     $value .= $data[$i];
@@ -161,8 +210,11 @@ class Haanga_Compiler_Tokenizer
                 $value .= $data[$i];
             }
         }
-        $this->token = HG_Parser::T_HTML;
-        $this->value = $value;
+
+        if ($value) {
+            $this->token = HG_Parser::T_HTML;
+            $this->value = $value;
+        }
     }
 
     function yylex_main()
@@ -171,16 +223,6 @@ class Haanga_Compiler_Tokenizer
 
         for ($i=&$this->N; is_null($this->token) && $i < $this->length; ++$i) {
             switch ($data[$i]) {
-            case '}':
-                switch ($data[$i+1]) {
-                case '%':
-                case '}':
-                case '#':
-                    $this->status = self::IN_HTML;
-                    $i += 2;
-                    break 3;
-                }
-                break;
 
             /* strings {{{ */
             case '"':
@@ -241,7 +283,7 @@ class Haanga_Compiler_Tokenizer
                     default: 
                         $this->value = $value;
                         $this->token = HG_Parser::T_NUMERIC;
-                        break 2;
+                        break 4; /* break the main loop */
                     }
                 }
                 break;
@@ -266,9 +308,15 @@ class Haanga_Compiler_Tokenizer
                     $this->value = $alpha;
 
                 }
-                break;
+                break 2;
             }
         }
+
+        if ($this->token == HG_Parser::T_CLOSE_TAG ||
+            $this->token == HG_Parser::T_PRINT_CLOSE) {
+            $this->status = self::IN_NONE;
+        }
+
     }
 
     function getTag()
@@ -362,13 +410,31 @@ class Haanga_Compiler_Tokenizer
         return $value;
     }
 
+    function getLine()
+    {
+        return $this->line;
+    }
+
 
     static function init($template, $compiler, $file='')
     {
         $lexer  = new Haanga_Compiler_Tokenizer($template, $compiler);
-        //$parser = new Haanga_Compiler_Parser($lexer, $file);
+        $parser = new Haanga_Compiler_Parser($lexer, $file);
 
-        return $lexer;
+        $parser->compiler = $compiler;
+
+        try {
+            for($i=0; ; $i++) {
+                if  (!$lexer->yylex()) {
+                    break;
+                }
+                $parser->doParse($lexer->token, $lexer->value);
+            }
+        } catch (Exception $e) {
+            throw new Haanga_Compiler_Exception($e->getMessage(). ' on line '.$lexer->getLine());
+        }
+        $parser->doParse(0, 0);
+        return (array)$parser->body;
 
     }
 }

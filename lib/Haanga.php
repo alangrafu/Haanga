@@ -304,7 +304,7 @@ class Haanga
                 require_once "{$dir}/Haanga/Compiler.php";
                 require_once "{$dir}/Haanga/Compiler/Runtime.php";
                 require_once "{$dir}/Haanga/Compiler/Parser.php";
-                require_once "{$dir}/Haanga/Compiler/Lexer.php";
+                require_once "{$dir}/Haanga/Compiler/Tokenizer.php";
                 require_once "{$dir}/Haanga/Generator/PHP.php";
                 require_once "{$dir}/Haanga/Extension.php";
                 require_once "{$dir}/Haanga/Extension/Filter.php";
