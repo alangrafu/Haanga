@@ -118,12 +118,13 @@ class Haanga_Compiler_Tokenizer
     const IN_ECHO    = 3;
     const IN_COMMENT = 4;
 
-    function __construct($data, $compiler)
+    function __construct($data, $compiler, $file)
     {
         $this->data     = $data;
         $this->compiler = $compiler;
         $this->line     = 1;
         $this->N        = 0;
+        $this->file     = $file;
         $this->length   = strlen($data);
 
 
@@ -307,7 +308,7 @@ class Haanga_Compiler_Tokenizer
                         }
                         break;
                     default: 
-                        if (!$this->is_whitespace($data[$i]) &&
+                        if (!$this->is_token_end($data[$i]) &&
                             !isset(self::$operations[$data[$i]]) || $value[$e-1] == '.') {
                             $this->error("Unexpected '{$data[$i]}'");
                         }
@@ -349,11 +350,6 @@ class Haanga_Compiler_Tokenizer
 
     }
 
-    function is_whitespace($letter)
-    {
-        return $letter=="\n" || $letter==" " || $letter=="\t" || $letter=="\r";
-    }
-
     function getTag()
     {
         static $lencache = array();
@@ -389,7 +385,7 @@ class Haanga_Compiler_Tokenizer
 
     function Error($text)
     {
-        throw new Haanga_Compiler_Exception($text." in :".$this->line);
+        throw new Haanga_Compiler_Exception($text." in ".$this->file.":".$this->line);
     }
 
     function getOperator()
@@ -469,7 +465,7 @@ class Haanga_Compiler_Tokenizer
 
     static function init($template, $compiler, $file='')
     {
-        $lexer  = new Haanga_Compiler_Tokenizer($template, $compiler);
+        $lexer  = new Haanga_Compiler_Tokenizer($template, $compiler, $file);
         $parser = new Haanga_Compiler_Parser($lexer, $file);
 
         $parser->compiler = $compiler;
