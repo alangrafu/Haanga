@@ -73,6 +73,7 @@ class Haanga_Compiler_Tokenizer
         '_('            => HG_Parser::T_INTL,
     );
 
+    /* common operations */
     static $operations = array(
         '&&'    => HG_Parser::T_AND,
         '=='    => HG_Parser::T_EQ,
@@ -190,7 +191,7 @@ class Haanga_Compiler_Tokenizer
                 $data  = & $this->data;
                 $i     = & $this->N;
 
-                if (($pos=strpos($data, "#}", $i)) === FALSE) {
+                if (($pos=strpos($data, self::$end_comment, $i)) === FALSE) {
                     $this->error("unexpected end");
                 }
                 $this->value  = substr($data, $i, $pos);
