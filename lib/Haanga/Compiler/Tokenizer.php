@@ -238,6 +238,8 @@ class Haanga_Compiler_Tokenizer
             $i = $this->length;
         }
 
+        $this->line += substr_count($this->value, "\n");
+
     }
 
 
